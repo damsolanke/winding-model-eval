@@ -1,0 +1,14 @@
+{
+  "source_volume": "${WINDEVAL_DATA}/zarr/PHerc0139/volumes/20260102150214-2.399um-0.2m-78keV-masked.zarr/2",
+  "target_volume": "${WINDEVAL_DATA}/zarr/PHerc0139/volumes/20250728140407-9.362um-1.2m-113keV-masked.zarr/0",
+  "segments": "${WINDEVAL_DATA}/eval/PHerc0139/segments_on_20260102150214_ds4",
+  "init_transform_json": "${WINDEVAL_DATA}/zarr/PHerc0139/volumes/20260102150214-2.399um-0.2m-78keV-masked.zarr/transform.json",
+  "init_source_scale": 4.0,
+  "init_target_scale": 1.0,
+  "z_range": [3900, 4300],
+  "n_blocks": 300,
+  "block": 48,
+  "ncc_min": 0.3,
+  "seed": 0,
+  "out": "results/transform_pherc0139_2399l2_to_9362.json"
+}

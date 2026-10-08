@@ -1,0 +1,77 @@
+Spawn-safe DataLoader workers for the winding dataset (macOS).
+
+Why: train_winding_model.py hard-codes multiprocessing_context="fork". On macOS a
+forked worker can abort inside the Objective-C runtime ("+[...] initialize may have
+been in progress in another thread when fork() was called") or segfault once that
+check is disabled. Both fork attempts of our PHerc1667 run died this way, while
+earlier PHerc0139 runs were unaffected, so it is a race at fork time. "spawn" needs a picklable
+dataset, and WindingModelDataset holds nanobind GridRaycaster objects (and
+VolumeSlabExtractor holds vc.Volume handles) that cannot be pickled.
+
+What: Segment drops its raycaster when pickled and rebuilds it from the grid when
+unpickled; VolumeSlabExtractor drops its per-process volume handles (they already
+reopen lazily); the trainer reads `dataloader_start_method` (default "fork",
+unchanged behaviour).
+
+Checked: on 8 PHerc0139 slabs drawn through spawn workers from the pickled dataset,
+labels and images are identical to the fork path (scripts/check_villa_patches.py).
+Limit: crossings-only patch packs (np.memmap) are pickled as full copies.
+
+diff --git a/vesuvius/src/vesuvius/neural_tracing/winding_models/train_winding_model.py b/vesuvius/src/vesuvius/neural_tracing/winding_models/train_winding_model.py
+index 25d2e99..1e05d10 100755
+--- a/vesuvius/src/vesuvius/neural_tracing/winding_models/train_winding_model.py
++++ b/vesuvius/src/vesuvius/neural_tracing/winding_models/train_winding_model.py
+@@ -419,7 +419,11 @@ def make_dataloader(dataset, config, *, generator, num_workers):
+     if num_workers > 0:
+         kwargs["persistent_workers"] = bool(config.get("persistent_workers", True))
+         kwargs["prefetch_factor"] = max(1, int(config.get("prefetch_factor", 2)))
+-        kwargs["multiprocessing_context"] = "fork"
++        # "fork" is fastest on Linux; macOS needs "spawn" (forked workers can
++        # abort in the Objective-C runtime).
++        kwargs["multiprocessing_context"] = str(
++            config.get("dataloader_start_method", "fork")
++        )
+         # Draws are procedural, so batch order carries no meaning; letting
+         # finished batches overtake a straggling worker keeps one slow draw
+         # from stalling the rank (and with DDP, every other rank).
+diff --git a/vesuvius/src/vesuvius/neural_tracing/winding_models/volume_slab_extractor.py b/vesuvius/src/vesuvius/neural_tracing/winding_models/volume_slab_extractor.py
+index 87d9a13..d990412 100644
+--- a/vesuvius/src/vesuvius/neural_tracing/winding_models/volume_slab_extractor.py
++++ b/vesuvius/src/vesuvius/neural_tracing/winding_models/volume_slab_extractor.py
+@@ -134,6 +134,12 @@ class VolumeSlabExtractor:
+         transform[:3, 3] = -inverse_linear @ values[:, 3] / target_downscale
+         return transform
+ 
++    def __getstate__(self):
++        # Volume handles are per process (see _volume) and not picklable.
++        state = self.__dict__.copy()
++        state["_volume_handles"] = {}
++        return state
++
+     def _volume(self, volume_idx: int) -> vc.Volume:
+         # DataLoader workers must not inherit another process's cache and I/O
+         # thread pool, so handles are deliberately opened lazily per process.
+diff --git a/vesuvius/src/vesuvius/neural_tracing/winding_models/winding_model_dataset.py b/vesuvius/src/vesuvius/neural_tracing/winding_models/winding_model_dataset.py
+index 808610f..23397b6 100644
+--- a/vesuvius/src/vesuvius/neural_tracing/winding_models/winding_model_dataset.py
++++ b/vesuvius/src/vesuvius/neural_tracing/winding_models/winding_model_dataset.py
+@@ -57,6 +57,19 @@ class Segment:
+     block_min: np.ndarray
+     block_max: np.ndarray
+ 
++    # GridRaycaster is a nanobind object and cannot be pickled, which "spawn"
++    # DataLoader workers need (macOS); rebuild it from the grid on unpickle.
++    def __getstate__(self):
++        state = self.__dict__.copy()
++        state["raycaster"] = self.raycaster is not None
++        return state
++
++    def __setstate__(self, state):
++        rebuild = bool(state["raycaster"])
++        self.__dict__.update(state, raycaster=None)
++        if rebuild:
++            self.raycaster = GridRaycaster(self.xyz, self.valid_quads)
++
+ 
+ @dataclass
+ class PatchRef:

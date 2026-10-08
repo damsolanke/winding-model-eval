@@ -1,0 +1,171 @@
+{
+ "name": "gate_pherc0139_2399_l2_z3904",
+ "checkpoint": "${WINDEVAL_DATA}/hf/winding_model_9um/ckpt_final.pth",
+ "checkpoint_sha256": "805a868c5ef518e4edb567ac2ddc63dfbf870f21b1164ae1642baa1781ad8f02",
+ "weights": "model",
+ "villa_commit": "e0bbb8b40a2db58b1d71864f286eb85717e59e64",
+ "device": "mps",
+ "torch": "2.14.1",
+ "precision": "fp32",
+ "num_slabs": 256,
+ "batch_size": 2,
+ "num_workers": 8,
+ "seed": 1000,
+ "segments": 37,
+ "region": {
+  "lo": [
+   3904,
+   0,
+   0
+  ],
+  "hi": [
+   4288,
+   6628,
+   6628
+  ]
+ },
+ "region_info": {
+  "origin_quads_before": 37708575,
+  "origin_quads_kept": 3249496,
+  "origin_quads_by_winding": {
+   "23": 69184,
+   "24": 72064,
+   "25": 74219,
+   "26": 79745,
+   "27": 79685,
+   "28": 80369,
+   "29": 81233,
+   "30": 82382,
+   "31": 83375,
+   "32": 84130,
+   "33": 85235,
+   "34": 85563,
+   "35": 57852,
+   "36": 75732,
+   "37": 78419,
+   "38": 81311,
+   "39": 83439,
+   "40": 86516,
+   "41": 86811,
+   "42": 84846,
+   "43": 87792,
+   "44": 87852,
+   "45": 89232,
+   "46": 89202,
+   "47": 91651,
+   "48": 92382,
+   "49": 102058,
+   "50": 41840,
+   "51": 103293,
+   "52": 105134,
+   "53": 111435,
+   "54": 120498,
+   "55": 112258,
+   "56": 104686,
+   "57": 105229,
+   "58": 105502,
+   "59": 107342
+  }
+ },
+ "metrics": {
+  "val_crossing_precision": 0.4404908698222524,
+  "val_crossing_recall": 0.42580043715472116,
+  "val_phase_mae": 0.1955973947624443,
+  "val_winding_count_error": 0.40466591744178637,
+  "val_density_mae": 0.01439026632173842
+ },
+ "losses": {
+  "val_loss": 0.05187721337824769,
+  "val_phase_loss": 0.028041994282830274,
+  "val_density_loss": 0.00024306322791289858,
+  "val_span_delta_loss": 0.11796077870531008,
+  "val_position_hinge_loss": 0.0,
+  "val_position_snap_loss": 0.0
+ },
+ "totals": {
+  "crossing_tp": 16758132,
+  "crossing_fp": 21286089,
+  "crossing_fn": 22598643,
+  "phase_abs_error": 50.07293305918574,
+  "phase_slabs": 256,
+  "count_error": 1695016.0350700617,
+  "count_columns": 4188680,
+  "density_abs_error": 60276.22073653928,
+  "density_mean_sigma": 0.0,
+  "density_columns": 4188680,
+  "density_sigma_columns": 0
+ },
+ "bootstrap_95": {
+  "precision": [
+   0.4171917771272809,
+   0.4641017415507867
+  ],
+  "recall": [
+   0.4022777564775282,
+   0.4492379943882276
+  ],
+  "count_error": [
+   0.3704474512330982,
+   0.44171309848650003
+  ],
+  "phase_mae": [
+   0.18151940068892145,
+   0.20924879168233018
+  ]
+ },
+ "supervised_columns": 4188680,
+ "crossings_labelled": 39356775,
+ "timing_s": {
+  "wall": 535.2956118583679,
+  "per_slab_wall": 2.0909984838217497,
+  "dataset_build": 3.3689279556274414,
+  "forward_per_batch": {
+   "mean": 3.1537120454893337,
+   "p50": 3.152467966079712,
+   "p95": 3.1717605590820312,
+   "min": 3.131438732147217,
+   "max": 3.2720839977264404
+  },
+  "data_wait_per_batch": {
+   "mean": 0.0006240183912862943,
+   "p50": 0.0006229877471923828,
+   "p95": 0.0019041061401367176,
+   "min": 4.8160552978515625e-05,
+   "max": 0.0029010772705078125
+  },
+  "metrics_per_batch": {
+   "mean": 0.7346351747437725,
+   "p50": 0.7109901905059814,
+   "p95": 0.8949339151382445,
+   "min": 0.5208547115325928,
+   "max": 1.0588428974151611
+  }
+ },
+ "memory_bytes": {
+  "mps_driver": 13005176832,
+  "mps_current": 441139456,
+  "rss_main": 3260940288,
+  "rss_workers": 20526825472
+ },
+ "data": {
+  "mirror_dirs": [
+   "${WINDEVAL_DATA}/zarr/PHerc0139/volumes/20260102150214-2.399um-0.2m-78keV-masked.zarr/2"
+  ],
+  "bytes_streamed_this_run": 3066045138,
+  "mirror_bytes_total": 3420490382,
+  "mirror_chunk_files": 1639
+ },
+ "config_overrides": {
+  "multiview_fraction": 0.0
+ },
+ "datasets": [
+  {
+   "volume_path": "${WINDEVAL_DATA}/zarr/PHerc0139/volumes/20260102150214-2.399um-0.2m-78keV-masked.zarr",
+   "volume_id": "20260102150214",
+   "volume_scale": 2,
+   "segment_volume_id": "20260102150214",
+   "segment_downscale": 4,
+   "segments_path": "${WINDEVAL_DATA}/eval/PHerc0139/segments_on_20260102150214_ds4"
+  }
+ ]
+}

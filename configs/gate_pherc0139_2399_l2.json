@@ -1,0 +1,24 @@
+{
+  "name": "gate_pherc0139_2399_l2_z3904",
+  "checkpoint": "${WINDEVAL_DATA}/hf/winding_model_9um/ckpt_final.pth",
+  "weights": "model",
+  "datasets": [
+    {
+      "volume_path": "${WINDEVAL_DATA}/zarr/PHerc0139/volumes/20260102150214-2.399um-0.2m-78keV-masked.zarr",
+      "volume_id": "20260102150214",
+      "volume_scale": 2,
+      "segment_volume_id": "20260102150214",
+      "segment_downscale": 4,
+      "segments_path": "${WINDEVAL_DATA}/eval/PHerc0139/segments_on_20260102150214_ds4"
+    }
+  ],
+  "region_zyx": {"lo": [3904, 0, 0], "hi": [4288, 6628, 6628]},
+  "overrides": {"multiview_fraction": 0.0},
+  "num_slabs": 256,
+  "batch_size": 2,
+  "num_workers": 8,
+  "seed": 1000,
+  "io_threads": 8,
+  "chunk_cache_bytes": 1073741824,
+  "device": "auto"
+}

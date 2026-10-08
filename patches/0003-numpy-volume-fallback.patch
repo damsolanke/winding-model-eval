@@ -1,0 +1,167 @@
+NumPy fallback for slab sampling when the volume-cartographer bindings are missing.
+
+Why: volume_slab_extractor.py imports `vc` for Volume.sample_planes / sample_coords.
+Those bindings need vc_core and do not build on macOS yet (open PR #1975). The other
+`vc` piece the dataset needs, vc.grid_raycast, is a self-contained source file and
+builds alone with nanobind (windeval/native/CMakeLists.txt).
+
+What: if `from vc import Volume` fails, use numpy_volume.py, which reads the zarr
+array with zarr-python and follows ChunkedPlaneSampler's requested-level sampling
+(XYZ coordinates, sentinel handling, fill value outside the array, float32 trilinear
+blend clamped and truncated to uint8). Known difference: zarr returns the fill value
+for absent chunks, where the C++ sampler zeroes any sample with a corner in an
+absent chunk.
+
+Checked: slab images bit-identical to windeval's chunk-level sampler on 8 PHerc0139
+slabs (50.3 M voxels); that sampler matches scipy's trilinear interpolation within
+one grey level. Not checked against the C++ sampler itself (no macOS build).
+
+diff --git a/vesuvius/src/vesuvius/neural_tracing/winding_models/numpy_volume.py b/vesuvius/src/vesuvius/neural_tracing/winding_models/numpy_volume.py
+new file mode 100644
+index 0000000..2fbfb39
+--- /dev/null
++++ b/vesuvius/src/vesuvius/neural_tracing/winding_models/numpy_volume.py
+@@ -0,0 +1,124 @@
++"""Pure NumPy fallback for the two `vc.Volume` calls the winding dataset makes.
++
++Used when the volume-cartographer Python bindings are unavailable (they do not
++build on macOS yet). Follows ChunkedPlaneSampler's requested-level trilinear and
++nearest sampling: XYZ voxel coordinates of the opened array, sentinel
++coordinates (non-finite, any component -1, or all zero) are invalid and read 0,
++points outside the array read the fill value, the trilinear blend is clamped
++to [0, 255] and truncated to uint8. One difference: zarr returns the fill value
++for absent chunks, where the C++ sampler zeroes any sample with a corner in an
++absent chunk; with fill value 0 this only matters at the edge of masked-out
++regions.
++"""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++import numpy as np
++
++
++def set_chunk_cache_budget(nbytes: int) -> None:  # zarr manages its own reads
++    del nbytes
++
++
++def set_chunk_cache_io_threads(count: int) -> None:
++    del count
++
++
++class Volume:
++    def __init__(self, path):
++        import zarr
++
++        node = zarr.open(str(path), mode="r")
++        if not hasattr(node, "shape"):
++            node = node["0"]
++        if node.dtype != np.uint8:
++            raise ValueError("numpy_volume supports uint8 arrays only")
++        self.array = node
++        self.shape = tuple(int(v) for v in node.shape)
++        fill = node.fill_value or 0
++        self.fill = np.uint8(min(max(int(round(float(fill))), 0), 255))
++
++    @classmethod
++    def open(cls, path) -> "Volume":
++        return cls(Path(path) if "://" not in str(path) else path)
++
++    def _sample(self, points: np.ndarray, sampling: str) -> tuple[np.ndarray, np.ndarray]:
++        size_z, size_y, size_x = self.shape
++        values = np.zeros(len(points), dtype=np.uint8)
++        finite = np.isfinite(points).all(axis=1)
++        sentinel = ~finite | (points == -1.0).any(axis=1) | (points == 0.0).all(axis=1)
++        valid = ~sentinel
++        x, y, z = points[:, 0], points[:, 1], points[:, 2]
++        inside = valid & (x >= 0) & (y >= 0) & (z >= 0) & (x < size_x) & (y < size_y) & (z < size_z)
++        values[valid & ~inside] = self.fill
++        index = np.flatnonzero(inside)
++        if not len(index):
++            return values, valid
++        p = points[index]
++        if sampling == "nearest":
++            corner = np.floor(p + np.float32(0.5)).astype(np.int64)
++            corner = np.minimum(corner, [size_x - 1, size_y - 1, size_z - 1])
++        elif sampling == "trilinear":
++            corner = np.floor(p).astype(np.int64)
++        else:
++            raise ValueError("sampling must be one of: nearest, trilinear")
++        lo = corner.min(axis=0)
++        hi = np.minimum(corner.max(axis=0) + 1, [size_x - 1, size_y - 1, size_z - 1])
++        block = np.asarray(self.array[lo[2]:hi[2] + 1, lo[1]:hi[1] + 1, lo[0]:hi[0] + 1])
++
++        def read(dz, dy, dx):
++            ix, iy, iz = corner[:, 0] + dx, corner[:, 1] + dy, corner[:, 2] + dz
++            outside = (ix >= size_x) | (iy >= size_y) | (iz >= size_z)
++            v = block[np.minimum(iz, size_z - 1) - lo[2], np.minimum(iy, size_y - 1) - lo[1],
++                      np.minimum(ix, size_x - 1) - lo[0]]
++            return np.where(outside, self.fill, v).astype(np.float32)
++
++        if sampling == "nearest":
++            values[index] = read(0, 0, 0).astype(np.uint8)
++            return values, valid
++        f = (p - corner.astype(np.float32)).astype(np.float32)
++        fx, fy, fz = f[:, 0], f[:, 1], f[:, 2]
++        v000, v001, v010, v011 = read(0, 0, 0), read(0, 0, 1), read(0, 1, 0), read(0, 1, 1)
++        v100, v101, v110, v111 = read(1, 0, 0), read(1, 0, 1), read(1, 1, 0), read(1, 1, 1)
++        c00 = fx * (v001 - v000) + v000
++        c01 = fx * (v011 - v010) + v010
++        c10 = fx * (v101 - v100) + v100
++        c11 = fx * (v111 - v110) + v110
++        c0 = fy * (c01 - c00) + c00
++        c1 = fy * (c11 - c10) + c10
++        values[index] = np.clip(fz * (c1 - c0) + c0, 0.0, 255.0).astype(np.uint8)
++        return values, valid
++
++    def sample_planes(self, origins_xyz, x_steps_xyz, y_steps_xyz, shape, level=0,
++                      sampling="trilinear", tile_size=32):
++        del tile_size
++        if level != 0:
++            raise ValueError("numpy_volume opens one physical array; level must be 0")
++        origins = np.asarray(origins_xyz, dtype=np.float32)
++        x_steps = np.asarray(x_steps_xyz, dtype=np.float32)
++        y_steps = np.asarray(y_steps_xyz, dtype=np.float32)
++        height, width = int(shape[0]), int(shape[1])
++        rows = origins[:, None, :] + np.arange(height, dtype=np.float32)[None, :, None] * y_steps[:, None, :]
++        coords = rows[:, :, None, :] + np.arange(width, dtype=np.float32)[None, None, :, None] * x_steps[:, None, None, :]
++        values, valid = self._sample(coords.reshape(-1, 3), sampling)
++        count = len(origins)
++        return (values.reshape(count, height, width),
++                valid.astype(np.uint8).reshape(count, height, width), {})
++
++    def sample_coords(self, coords_xyz, valid_mask, level=0, sampling="trilinear",
++                      tile_size=32, blocking=True):
++        del tile_size, blocking
++        if level != 0:
++            raise ValueError("numpy_volume opens one physical array; level must be 0")
++        coords = np.asarray(coords_xyz, dtype=np.float32)
++        mask = np.asarray(valid_mask, dtype=bool).reshape(-1)
++        height, width = coords.shape[:2]
++        image = np.zeros(height * width, dtype=np.uint8)
++        valid = np.zeros(height * width, dtype=np.uint8)
++        take = np.flatnonzero(mask)
++        if len(take):
++            v, ok = self._sample(coords.reshape(-1, 3)[take], sampling)
++            image[take], valid[take] = v, ok
++        return image.reshape(height, width, 1), valid.reshape(height, width, 1), {}
+diff --git a/vesuvius/src/vesuvius/neural_tracing/winding_models/volume_slab_extractor.py b/vesuvius/src/vesuvius/neural_tracing/winding_models/volume_slab_extractor.py
+index d990412..9dc6353 100644
+--- a/vesuvius/src/vesuvius/neural_tracing/winding_models/volume_slab_extractor.py
++++ b/vesuvius/src/vesuvius/neural_tracing/winding_models/volume_slab_extractor.py
+@@ -7,7 +7,13 @@ from dataclasses import dataclass
+ from pathlib import Path
+ 
+ import numpy as np
+-import vc
++
++try:
++    import vc
++    from vc import Volume as _NativeVolume  # noqa: F401  (full bindings, not only vc.grid_raycast)
++except ImportError:
++    # No volume-cartographer bindings (e.g. macOS, see PR #1975).
++    from vesuvius.neural_tracing.winding_models import numpy_volume as vc
+ 
+ 
+ @dataclass(frozen=True)

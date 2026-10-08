@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.so
+*.dylib
+build/
+.venv/
+.env
+.vscode/
+.cursor/
+.DS_Store

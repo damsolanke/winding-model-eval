@@ -1,0 +1,21 @@
+{
+  "name": "cond3_pherc0841_9366_all",
+  "checkpoint": "${WINDEVAL_DATA}/hf/winding_model_9um/ckpt_final.pth",
+  "weights": "model",
+  "datasets": [
+    {
+      "volume_path": "${WINDEVAL_DATA}/zarr/PHerc0841/volumes/20250821151531-9.366um-1.2m-113keV-masked.zarr",
+      "volume_scale": 0,
+      "segment_downscale": 1,
+      "segments_path": "${WINDEVAL_DATA}/eval/PHerc0841/segments_on_20250821151531"
+    }
+  ],
+  "overrides": {"multiview_fraction": 0.0},
+  "num_slabs": 256,
+  "batch_size": 2,
+  "num_workers": 8,
+  "seed": 1000,
+  "io_threads": 8,
+  "chunk_cache_bytes": 1073741824,
+  "device": "auto"
+}

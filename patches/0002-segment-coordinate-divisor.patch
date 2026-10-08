@@ -1,0 +1,52 @@
+Optional `segment_coordinate_divisor` for meshes published in full-resolution voxels.
+
+Why: slabs are sampled at `spacing` segment units, and every length constant in the
+dataset (ray length, merge distance, match tolerance) is in those units, so segment
+units must equal the voxel size the model was trained at (about 9.6 um, i.e. level 2
+of a 2.4 um scan). The released config reads PHerc0139 with segment_downscale 4,
+which only works with meshes already divided by 4. The published
+`<id>-on-<volume>-2.399um.tifxyz` meshes are in full-resolution voxels; read as-is
+(segment_downscale 1) the model sees 4x zoomed slabs and scores precision 0.13 and
+winding count error 2.9 instead of 0.44 and 0.41.
+
+What: a per-dataset `segment_coordinate_divisor` (default 1, unchanged behaviour)
+divides valid vertex coordinates on load. Use it together with segment_downscale,
+e.g. {"volume_scale": 2, "segment_downscale": 4, "segment_coordinate_divisor": 4}.
+
+Checked: published meshes with divisor 4 give labels identical to pre-divided copies
+on 8 PHerc0139 slabs (division by 4 is exact in float32).
+
+diff --git a/vesuvius/src/vesuvius/neural_tracing/winding_models/winding_model_dataset.py b/vesuvius/src/vesuvius/neural_tracing/winding_models/winding_model_dataset.py
+index 23397b6..cd26b65 100644
+--- a/vesuvius/src/vesuvius/neural_tracing/winding_models/winding_model_dataset.py
++++ b/vesuvius/src/vesuvius/neural_tracing/winding_models/winding_model_dataset.py
+@@ -274,6 +274,9 @@ class WindingModelDataset(torch.utils.data.Dataset):
+                         info.path,
+                         erode_cells=erode_cells,
+                         inner_fraction=inner_fraction,
++                        coordinate_divisor=float(
++                            volume_cfg.get("segment_coordinate_divisor", 1.0)
++                        ),
+                     )
+                     if not len(segment.sample_cells):
+                         print(
+@@ -462,12 +465,19 @@ class WindingModelDataset(torch.utils.data.Dataset):
+         inner_fraction: float | None = None,
+         build_raycaster: bool = True,
+         need_turns: bool = True,
++        coordinate_divisor: float = 1.0,
+     ) -> Segment:
+         surface = tifxyz.read_tifxyz(path)
+         xyz = np.ascontiguousarray(
+             np.stack([surface._x, surface._y, surface._z], axis=-1),
+             dtype=np.float32,
+         )
++        if coordinate_divisor != 1.0:
++            # Slabs are sampled at `spacing` segment units, so segment units
++            # must match the voxel size the model was trained at. Published
++            # meshes are in full-resolution voxels; reading them against a
++            # downsampled level (segment_downscale > 1) needs the same divisor.
++            xyz[surface.valid_vertex_mask] /= np.float32(coordinate_divisor)
+         winding_idx = self._winding_index(path)
+ 
+         # Trim vertices near the border of the valid region, where annotation
