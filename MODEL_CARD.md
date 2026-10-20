@@ -40,7 +40,7 @@ Dense per-ray winding observations for global spiral fitting of whole scrolls (`
 | PHerc1667 | `20251217075048-2.399um-0.2m-78keV-masked.zarr` | level 2, meshes / 4 | `winding_train_data/PHerc1667/segments` |
 | PHercParis4 | `s1_2um_ds2.zarr` | scale 0 | `spiral_fit` (not public) |
 
-All three training CT volumes were reconstructed with Paganin phase retrieval at delta/beta 1000 plus unsharp masking (coefficient 4, sigma 1.2), according to the public volumes' `metadata.json`. Rays are sampled from labelled segments (numbered windings at least 4 apart, or multi-wrap segments), proportional to segment area. The fraction of slabs drawn from each scroll is not stated.
+All three training CT volumes were reconstructed with Paganin phase retrieval at delta/beta 1000 plus unsharp masking (coefficient 4, sigma 1.2), according to the public volumes' `metadata.json`. Rays are sampled from labelled segments (numbered windings at least 4 apart, or multi-wrap segments), proportional to segment area. How many slabs come from each scroll is not stated.
 
 ## Training procedure (from config)
 
@@ -94,15 +94,34 @@ PHerc0841 could not be scored: its three published segments are single sheets of
 
 - **Phase retrieval.** On reconstructions with weaker phase retrieval than training (delta/beta 50 or none) the winding count error rises from 0.5 to about 1.9 windings per column. Use delta/beta 1000 reconstructions, or retrain with these variants.
 - **Scan protocol.** On the eligible-protocol 9.362 um 113 keV scan of the same sheets the model loses about 0.03 precision and 0.04 recall, and count error rises by 0.11. Resampling that scan to the training voxel size changes nothing measurable.
-- **Voxel size.** At native 7.91 um sampling (PHerc0172) count error is 4.9 windings per column; resampling to 9.6 um halves it. A 2.8 % mismatch (9.36 against 9.63 um) has no measurable effect. Gaussian blur along or across the sheets makes things worse.
+- **Voxel size.** At native 7.91 um sampling (PHerc0172) count error is 4.9 windings per column; resampling to 9.6 um halves it. A 2.8 % mismatch (9.36 against 9.63 um) has no measurable effect. Reading the eligible-protocol scan at 8.64 um (simulated by re-sampling) adds 0.036 count error per column and 0.017 phase MAE, and on a real 8.64 um scan (PHerc0343) native reading costs 0.025 count error and 0.033 precision against resampling; see the next section. Gaussian blur along or across the sheets makes things worse.
 - **Other beamlines.** On the DLS scan of PHerc0172 the model stays well below its ESRF numbers even after resampling (count error 2.4).
 - **Labels.** In PHerc0139 the meshes named w042 and w046 lie on the sheets of w041 and w045 (0.8 and 0.1 level-2 voxels apart along the normal in the evaluated band), and w046 to w047 spans about two winding gaps. Removing them changes nothing measurable (the sampler merges coincident crossings), but anything that reads them as distinct windings gets two numbers for one sheet. Slabs crossing windings w040 to w049 score far below the rest for reasons these two meshes do not explain.
 - **Single checkpoint, single band per scroll.** Numbers come from one z band per scroll (256 slabs each); blocks of the scroll vary (angular-sector intervals are reported in windeval).
 - **Inputs must match the training sample size.** Segment coordinates must be in units of the training voxel (about 9.6 um). The published full-resolution meshes need dividing by 4 for level-2 slabs; read as-is, precision falls to 0.13.
 
+## Running on the eligible scans
+
+The 22 volumes eligible for the 2027 Grand Prize (13) or a First Letters prize (21), as listed on scrollprize.org/prizes on 2026-10-19, are ESRF BM18 scans reconstructed like the training scans: Paganin delta/beta 1000, unsharp mask 4 / 1.2, GHBP (each volume's `metadata.json`). None of them is affected by the `pag50` / `pag0` failure above. They come at two voxel sizes.
+
+| Voxel size | Beam, distance | Volumes | Grand Prize set | First Letters set |
+|---|---|---|---|---|
+| 8.640 um | 116 keV, 1.2 m | PHerc0175A, 0175B, 0268, 0306B, 0483A, 0483B, 0490A, 0490B, 0800, 1218, 1447 | 0268, 0800, 1218, 1447 | all but 1447 |
+| 9.362 um | 113 keV, 1.2 m | PHerc0125, 0191, 0211, 0257, 0358, 0813, 0826, 0846A, 0846B, 1203, 1545 | all but 0846A and 0846B | all 11 |
+
+PHerc0343, whose First Letters prize was awarded on 2026-10-08, is also an 8.64 um scan with this reconstruction. PHerc0846A and PHerc1203 also have 2.403 um, 77 keV, 0.2 m scans close to the training protocol; those were not evaluated.
+
+| Volume | Recommendation | Evidence (same rays and labels, paired 95 % intervals) |
+|---|---|---|
+| 9.362 um | Read at one sample per voxel | PHerc0139's 9.362 um scan read at 9.36 um and at the training voxel (9.63 um) gives the same count error (change -0.001, -0.014 to +0.012). Against the 2.4 um training scan, the protocol itself costs about 0.03 precision, 0.04 recall and 0.11 count error; resampling does not change that |
+| 8.64 um | Resample to the training voxel, about 9.6 um (a slab step of 1.115 voxels, 9.63 / 8.64) | Read at 8.64 um, the PHerc0139 9.362 um scan shows 0.036 more count error per column (-0.001 to +0.071; 13 % per labelled winding step, +6 % to +20 %) and 0.017 more phase MAE (+0.007 to +0.027). At the training voxel it returns to the reference values. PHerc1667's training scan shows no loss at 8.64 um. On PHerc0343's real 8.64 um scan (w047 and w048, 256 rays), resampling lowers count error by 0.025 (95 % interval 0.015 to 0.035) and raises precision by 0.033 (0.016 to 0.049) |
+| either | Do not go coarser than the training voxel | At 10.2 to 10.8 um, count error and phase MAE improve slightly on PHerc0139, phase MAE gets worse on PHerc1667 (10.2 um), and crossing precision and recall drop |
+
+villa's `infer_winding_volume.py` (commit `e0bbb8b`, unchanged on main as of 2026-10-19) takes the slab step from the checkpoint config (`spacing: 1.0`, one voxel of the `--volume-scale` level) and has no option to change it, so it reads an 8.64 um volume at 8.64 um. Following the recommendation needs either a volume resampled to about 9.6 um, with the fit and the outputs in that frame, or a change to how the script sets the step. Neither was run for this card. The PHerc0139 and PHerc1667 numbers come from re-sampling scans of training scrolls, which reproduces the change of scale but not the finer detail of a real 8.64 um scan. PHerc0343 is a real 8.64 um scan, but its labels are one pair of adjacent spiral-fit windings (Erwin Nieuwlaar's w047 and w048). Details are in REPORT.md, section 6.
+
 ## How to reproduce
 
-See [REPORT.md](REPORT.md) (exact commands) and [README.md](README.md) (setup). The evaluation reuses villa's dataset, losses and metric code unchanged.
+See [REPORT.md](REPORT.md) (exact commands) and [README.md](README.md) (setup). This evaluation reuses villa's dataset, losses and metric code unchanged.
 
 ## License
 

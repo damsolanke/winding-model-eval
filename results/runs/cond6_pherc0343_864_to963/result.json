@@ -1,0 +1,161 @@
+{
+ "name": "cond6_pherc0343_864_to963",
+ "checkpoint": "${WINDEVAL_DATA}/hf/winding_model_9um/ckpt_final.pth",
+ "checkpoint_sha256": "805a868c5ef518e4edb567ac2ddc63dfbf870f21b1164ae1642baa1781ad8f02",
+ "weights": "model",
+ "villa_commit": "e0bbb8b40a2db58b1d71864f286eb85717e59e64",
+ "device": "mps",
+ "torch": "2.14.1",
+ "precision": "fp32",
+ "num_slabs": 256,
+ "batch_size": 2,
+ "num_workers": 4,
+ "start_method": "spawn",
+ "seed": 1000,
+ "segments": 2,
+ "region": {
+  "lo": [
+   10048,
+   0,
+   0
+  ],
+  "hi": [
+   10476,
+   8595,
+   8595
+  ]
+ },
+ "region_info": {
+  "origin_quads_before": 31421,
+  "origin_quads_kept": 10704,
+  "origin_quads_by_winding": {
+   "47": 5234,
+   "48": 5470
+  }
+ },
+ "metrics": {
+  "val_crossing_precision": 0.5373605155254432,
+  "val_crossing_recall": 0.32030424323968604,
+  "val_phase_mae": 0.2899376525747357,
+  "val_winding_count_error": 0.2999756985300668,
+  "val_density_mae": 0.026991691575621136
+ },
+ "losses": {
+  "val_loss": 0.05079103969728749,
+  "val_phase_loss": 0.05003470954943623,
+  "val_density_loss": 0.0007563300831634479,
+  "val_span_delta_loss": 0.0,
+  "val_position_hinge_loss": 0.0,
+  "val_position_snap_loss": 0.0
+ },
+ "totals": {
+  "crossing_tp": 2448200,
+  "crossing_fp": 2107773,
+  "crossing_fn": 5195158,
+  "phase_abs_error": 74.22403905913234,
+  "phase_slabs": 256,
+  "count_error": 1146410.8275826871,
+  "count_columns": 3821679,
+  "density_abs_error": 101579.69533325374,
+  "density_mean_sigma": 0.0,
+  "density_columns": 3763369,
+  "density_sigma_columns": 0
+ },
+ "bootstrap_95": {
+  "precision": [
+   0.5052586297741044,
+   0.5683206869168739
+  ],
+  "recall": [
+   0.2893831093186817,
+   0.35092299699628077
+  ],
+  "count_error": [
+   0.2769304939670732,
+   0.32199956844995564
+  ],
+  "phase_mae": [
+   0.25888547566501074,
+   0.3241678335165488
+  ]
+ },
+ "label_agreement_by_winding": {
+  "47": {
+   "labels": 3821679,
+   "within_tolerance": 1223043,
+   "frac_within_tolerance": 0.32002766323388226,
+   "mean_oriented_residual_within_8": 1.6149626376176573
+  },
+  "48": {
+   "labels": 3821679,
+   "within_tolerance": 1226157,
+   "frac_within_tolerance": 0.3208424883408575,
+   "mean_oriented_residual_within_8": -1.7135408950106956
+  }
+ },
+ "supervised_columns": 3821679,
+ "crossings_labelled": 7643358,
+ "timing_s": {
+  "wall": 736.693145275116,
+  "per_slab_wall": 2.8777075987309217,
+  "dataset_build": 0.012568235397338867,
+  "forward_per_batch": {
+   "mean": 3.5663359259057232,
+   "p50": 3.552110195159912,
+   "p95": 3.725911498069763,
+   "min": 3.3985280990600586,
+   "max": 3.846447706222534
+  },
+  "data_wait_per_batch": {
+   "mean": 0.0015925309789462353,
+   "p50": 0.0014109611511230469,
+   "p95": 0.0033030748367309506,
+   "min": 8.296966552734375e-05,
+   "max": 0.018706083297729492
+  },
+  "metrics_per_batch": {
+   "mean": 1.897051289325624,
+   "p50": 1.8611869812011719,
+   "p95": 2.817347311973571,
+   "min": 0.7333629131317139,
+   "max": 3.0431320667266846
+  }
+ },
+ "memory_bytes": {
+  "mps_driver": 13005176832,
+  "mps_current": 445858304,
+  "rss_main": 1312571392,
+  "rss_workers": 16077373440
+ },
+ "data": {
+  "mirror_dirs": [
+   "${WINDEVAL_DATA}/zarr/PHerc0343/volumes/20250521140437-8.640um-1.2m-116keV-masked.zarr/0",
+   "${WINDEVAL_DATA}/zarr/PHerc0343/volumes/20250521140437-8.640um-1.2m-116keV-masked.zarr/0"
+  ],
+  "bytes_streamed_this_run": 473956352,
+  "mirror_bytes_total": 4811033294,
+  "mirror_chunk_files": 2314
+ },
+ "config_overrides": {
+  "multiview_fraction": 0.0,
+  "min_winding_gap": 1
+ },
+ "replay": {
+  "volume_path": "${WINDEVAL_DATA}/zarr/PHerc0343/volumes/20250521140437-8.640um-1.2m-116keV-masked.zarr",
+  "volume_scale": 0,
+  "transform": "identity",
+  "sample_spacing": 1.11462
+ },
+ "replay_failed_slabs": 0,
+ "segment_to_volume_scale": null,
+ "datasets": [
+  {
+   "volume_path": "${WINDEVAL_DATA}/zarr/PHerc0343/volumes/20250521140437-8.640um-1.2m-116keV-masked.zarr",
+   "volume_id": "20250521140437",
+   "volume_scale": 0,
+   "segment_volume_id": "20250521140437",
+   "segment_downscale": 1,
+   "segments_path": "${WINDEVAL_DATA}/eval/PHerc0343/segments_w047_w048_nieuwlaar"
+  }
+ ]
+}

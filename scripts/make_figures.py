@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import matplotlib
+import matplotlib.patches
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -146,12 +147,56 @@ def fig_unseen():
     plt.close(fig)
 
 
+def fig_voxel_sweep():
+    data = load_compare(RES / "compare_voxel_sweep.json")
+    if not data:
+        return
+    series = [s for s in (
+        ("PHerc0139", BLUE, "o", -0.05, "PHerc0139: eligible-protocol 9.362 um scan (113 keV, 1.2 m), re-sampled"),
+        ("PHerc1667", ORANGE, "s", 0.0, "PHerc1667: 2.399 um training scan at level 2 (78 keV), re-sampled"),
+        ("PHerc0343", AQUA, "^", 0.05, "PHerc0343: real 8.64 um scan (116 keV, 1.2 m), windings w047 and w048"),
+    ) if s[0] in data["scrolls"]]
+    fig, axes = plt.subplots(2, 4, figsize=(11, 5.4), sharex=True, gridspec_kw={"hspace": 0.28, "wspace": 0.32})
+    for row, (key, title) in zip(axes.T, METRICS):
+        for scroll, color, marker, dodge, _ in series:
+            runs = data["scrolls"][scroll]["runs"]
+            xs = [r["voxel_um"] + dodge for r in runs]
+            infos = [r["groups"]["all"] for r in runs]
+            for ax, value, interval in ((row[0], lambda i: i[key], lambda i: i["ci95"][key]),
+                                        (row[1], lambda i: i["delta"][key], lambda i: i.get("delta_ci95", {}).get(key))):
+                ax.plot(xs, [value(i) for i in infos], color=color, lw=1, alpha=0.5)
+                for x, i in zip(xs, infos):
+                    ci = interval(i)
+                    if ci and ci[1] > ci[0]:
+                        ax.plot([x, x], ci, color=color, lw=2, solid_capstyle="round")
+                    ax.plot(x, value(i), marker, ms=5.5, color=color, mec=SURFACE, mew=1.2)
+        row[0].set_title(title, loc="left")
+        row[1].axhline(0, color=INK2, lw=0.8)
+        for ax in row:
+            for x in (8.64, 9.362):
+                ax.axvline(x, color=INK2, lw=0.7, alpha=0.45)
+            ax.axvspan(9.58, 9.68, color=GRID, lw=0)
+        row[1].set_xlabel("equivalent voxel size (um)")
+        row[1].set_xticks([8, 9, 10, 11])
+    axes[0, 0].set_ylabel("pooled over 256 slabs")
+    axes[1, 0].set_ylabel("paired change against\nthe 9.63 um reading")
+    handles = [plt.Line2D([], [], color=c, marker=m, lw=2, label=lab) for _, c, m, _, lab in series]
+    handles += [plt.Line2D([], [], color=INK2, lw=0.7, alpha=0.45, label="8.64 and 9.362 um: the two eligible-scan voxel sizes"),
+                matplotlib.patches.Patch(color=GRID, label="9.63 um: one training voxel per sample (reference)")]
+    fig.legend(handles=handles, loc="upper left", ncol=2, bbox_to_anchor=(0.0, 1.075))
+    fig.suptitle("Same rays read at other sample steps: each scroll's 256 rays and labels, 95 % slab-bootstrap "
+                 "intervals (paired in the bottom row)", x=0.0, ha="left", y=1.11, fontsize=10.5, fontweight="bold")
+    fig.savefig(FIG / "fig5_voxel_size.png", dpi=170, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main():
     FIG.mkdir(exist_ok=True)
     fig_reconstruction()
     fig_label_pairs()
     fig_example_slab()
     fig_unseen()
+    fig_voxel_sweep()
     print("figures:", sorted(p.name for p in FIG.glob("*.png")))
 
 

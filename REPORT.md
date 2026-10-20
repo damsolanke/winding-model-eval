@@ -1,6 +1,6 @@
 # winding_model_9um on held-out scans and scrolls
 
-**Summary.** On fresh draws from its own training scans, `scrollprize/winding_model_9um` matches its training log only where the PHerc0139 labels are clean. On the eligible-protocol 9.362 um scan of the same sheets it loses 0.03 precision and 0.04 recall, with count error up 0.11. Weaker phase retrieval (`pag50`, `pag0`) and an unseen 7.91 um DLS scan break it, with winding count error above 1.8 per column.
+**Summary.** On fresh draws from its own training scans, `scrollprize/winding_model_9um` matches its training log only where the PHerc0139 labels are clean. On the eligible-protocol 9.362 um scan of the same sheets it loses 0.03 precision and 0.04 recall, with count error up 0.11. Weaker phase retrieval (`pag50`, `pag0`) and an unseen 7.91 um DLS scan break it, with winding count error above 1.8 per column. None of the 22 prize-eligible volumes uses the weaker phase retrieval, but half of them are 8.64 um scans. Read at that voxel size (simulated on the eligible-protocol scan, section 6), the model adds 0.036 to the count error per column (13 % per labelled winding step) and 0.017 to the phase MAE, and resampling to the training voxel of about 9.6 um removes the loss. PHerc1667's training scan shows no such loss. On PHerc0343, a real 8.64 um scan with two labelled windings, resampling lowers the count error by 0.025 and raises precision by 0.033.
 
 All numbers below come from villa's own dataset, losses and metric code (`WindingModelDataset`, `compute_losses`, `accumulate_winding_metrics` and `finalize_winding_metrics` in `train_winding_model.py`, at commit `e0bbb8b`), run unchanged on an Apple M4 Max. Each condition uses 256 fresh slabs (rays) drawn the way `validation_mode: "separate"` draws them. Intervals are 95 % slab bootstraps; "change" intervals are paired bootstraps over identical slabs.
 
@@ -120,7 +120,64 @@ Removing the two meshes changes nothing measurable. villa's 3-sample crossing me
 
 *Figure 4. One PHerc0139 slab started on w043: labelled crossings (published meshes) and the model's decoded phase passages along the centre row of 128 columns. No CT pixels are shown.*
 
-## 6. Runtime and memory on the M4 Max
+## 6. The other eligible voxel size: 8.64 um (conditions 5 and 6)
+
+All 22 volumes eligible for the 2027 Grand Prize or a First Letters prize use the training reconstruction (Paganin delta/beta 1000, unsharp mask 4 / 1.2, per each volume's `metadata.json`), so the `pag0` and `pag50` failures in section 2 apply to none of them. Eleven are 9.362 um, 113 keV scans like the one in section 2; the other eleven are 8.64 um, 116 keV scans, also at 1.2 m, and had not been measured.
+
+Labelled 8.64 um data exist only for two adjacent windings of PHerc0343 (condition 6, below), so the main test changes the sample step rather than the scan. `windeval/replay.py` reads every slab along the same rays at a step of s training voxels, which gives the model the geometry of a scan with an s x 9.63 um voxel read at one sample per voxel. That 9.63 um is one 2.399 um level-2 voxel measured on the 9.362 um scan by the fitted affine (scale 1.0287); section 4's native row is the same construction at s = 0.972. PHerc1667 uses the same steps; measured against its nominal 9.596 um level-2 voxel, its equivalent sizes are 0.4 % smaller. Labels are re-rendered at each step by villa's rasterizer (configs `cond5_*`).
+
+| Scroll | CT read | Equivalent voxel sizes (um) | Reference at 9.63 um |
+|---|---|---|---|
+| PHerc0139 | 9.362 um, 113 keV, 1.2 m (eligible protocol), along the section 2 rays | 7.9, 8.3, 8.64, 9.0, 9.36 (section 4), 10.2, 10.8 | section 2, default scan |
+| PHerc1667 | 2.399 um, 78 keV training scan at level 2, re-sampled in place | 8.3, 8.64, 9.36, 10.2 | section 1 |
+
+A finer step shortens the 384-sample ray in physical terms. In 3 slabs (PHerc0139 at 7.9 um, PHerc1667 at 8.3 um) and 2 slabs (PHerc1667 at 8.64 um) the shorter slab keeps too few supervised columns for villa's renderer; those slabs are dropped from both sides of the pair. Each cell gives the metric and its paired change against the 9.63 um reading with the 95 % interval.
+
+| PHerc0139, eligible-protocol scan | Slabs | Precision | Recall | Count error | Phase MAE |
+|---|---|---|---|---|---|
+| 7.9 um (step 0.820) | 253 | 0.386, -0.021 (-0.040 to -0.004) | 0.348, -0.033 (-0.052 to -0.015) | 0.655, +0.135 (+0.071 to +0.197) | 0.291, +0.052 (+0.034 to +0.068) |
+| 8.3 um (0.862) | 256 | 0.401, -0.007 (-0.021 to +0.006) | 0.364, -0.017 (-0.032 to -0.003) | 0.589, +0.072 (+0.025 to +0.120) | 0.268, +0.028 (+0.015 to +0.041) |
+| **8.64 um (0.897)** | 256 | 0.408, -0.000 (-0.011 to +0.011) | 0.374, -0.007 (-0.018 to +0.004) | **0.553, +0.036 (-0.001 to +0.071)** | **0.257, +0.017 (+0.007 to +0.027)** |
+| 9.0 um (0.935) | 256 | 0.410, +0.001 (-0.006 to +0.008) | 0.378, -0.003 (-0.010 to +0.004) | 0.539, +0.021 (-0.005 to +0.047) | 0.250, +0.010 (+0.004 to +0.017) |
+| 9.36 um (0.972, native) | 256 | 0.409, -0.000 (-0.004 to +0.004) | 0.380, -0.001 (-0.005 to +0.003) | 0.517, -0.001 (-0.014 to +0.012) | 0.244, +0.004 (+0.001 to +0.007) |
+| 9.63 um (1, reference) | 256 | 0.409 | 0.381 | 0.518 | 0.240 |
+| 10.2 um (1.059) | 256 | 0.404, -0.004 (-0.011 to +0.002) | 0.378, -0.003 (-0.010 to +0.003) | 0.507, -0.011 (-0.028 to +0.006) | 0.231, -0.008 (-0.013 to -0.004) |
+| 10.8 um (1.121) | 256 | 0.400, -0.009 (-0.019 to +0.001) | 0.374, -0.007 (-0.017 to +0.003) | 0.488, -0.029 (-0.059 to -0.002) | 0.227, -0.012 (-0.019 to -0.006) |
+
+| PHerc1667, training scan | Slabs | Precision | Recall | Count error | Phase MAE |
+|---|---|---|---|---|---|
+| 8.3 um (0.862) | 253 | 0.470, +0.024 (+0.015 to +0.033) | 0.443, +0.029 (+0.020 to +0.038) | 0.505, -0.002 (-0.026 to +0.018) | 0.185, -0.003 (-0.008 to +0.002) |
+| **8.64 um (0.897)** | 254 | 0.463, +0.018 (+0.010 to +0.025) | 0.437, +0.024 (+0.016 to +0.031) | **0.511, +0.003 (-0.011 to +0.016)** | **0.186, -0.002 (-0.006 to +0.001)** |
+| 9.36 um (0.972) | 256 | 0.451, +0.005 (+0.001 to +0.008) | 0.420, +0.006 (+0.003 to +0.009) | 0.509, +0.003 (-0.002 to +0.008) | 0.187, -0.001 (-0.002 to +0.001) |
+| 9.63 um (1, reference) | 256 | 0.446 | 0.414 | 0.506 | 0.187 |
+| 10.2 um (1.059) | 256 | 0.432, -0.015 (-0.018 to -0.010) | 0.397, -0.017 (-0.021 to -0.014) | 0.509, +0.003 (-0.004 to +0.012) | 0.191, +0.004 (+0.002 to +0.006) |
+
+![Metrics against equivalent voxel size](figures/fig5_voxel_size.png)
+
+*Figure 5. Each scroll's rays read at other sample steps; PHerc0343 is the real 8.64 um scan of condition 6. Top: pooled metrics with 95 % slab-bootstrap intervals. Bottom: paired change against the 9.63 um reading. Source: `results/compare_voxel_sweep.json` (`scripts/voxel_sweep.py`); the PHerc0139 band split is in `results/compare_voxel_sweep.md`.*
+
+**What 8.64 um costs.** Reading the eligible-protocol scan at 8.64 um instead of the training voxel adds 0.036 to the count error per column (+7 %, interval -0.001 to +0.071) and 0.017 to the phase MAE (+0.007 to +0.027). At the finer step the ray holds fewer labelled crossings (8.96 per supervised column against 9.40), so per labelled winding step the count error rises by 13 % (+6 % to +20 %). Slabs on either side of the w040 to w049 band move by the same amount: count error +0.032 outside and +0.037 touching, phase MAE +0.016 and +0.017. Precision and recall barely move (-0.000 and -0.007, intervals within 0.02 of zero). PHerc1667's training scan, read at the same step, keeps its count error and phase MAE (+0.003 and -0.002).
+
+**How large that is.** It is about a third of what the 9.362 um protocol costs on the same rays (count error +0.113, phase MAE +0.044 against the training scan, section 2), and it grows with the mismatch: +0.021 at 9.0 um, +0.072 at 8.3 um, +0.135 at 7.9 um. A 7.9 um step is the PHerc0172 mismatch, which cost the DLS scan 2.4 windings per column (sections 3 and 4, not on identical rays). Here, on an ESRF scan with the training reconstruction, it costs about one eighteenth as much.
+
+**Resampling.** In this setup the 9.63 um reading is the resampled case: an 8.64 um volume read at a step of 1.115 voxels (9.63 / 8.64) presents the model with the reference geometry. For PHerc0139 that removes the added count error and phase MAE, while PHerc1667 has nothing to remove. A step coarser than the training voxel is no better. Count error and phase MAE keep falling on PHerc0139 at 10.2 and 10.8 um, but PHerc1667's phase MAE rises at 10.2 um (+0.004, +0.002 to +0.006), and precision and recall fall (PHerc1667 at 10.2 um; PHerc0139 outside the band at 10.2 and 10.8 um).
+
+**Precision and recall across steps.** villa matches passages to labels within 2 training voxels, a physical tolerance that spans 2.23 samples at 8.64 um and 1.89 samples at 10.2 um. On PHerc1667, precision and recall rise as the step shrinks and fall as it grows (+0.018 and +0.024 at 8.64 um, -0.015 and -0.017 at 10.2 um); on PHerc0139 they fall at the coarser steps outside the band. Both are what a passage error of constant size in samples would produce, so on PHerc0139 the tolerance may also hide part of a loss at the finer steps. Neither count error nor phase MAE uses a tolerance, and count error is the quantity `fit_spiral`'s density loss integrates (villa's docstring), so the verdict rests on those two.
+
+**A real 8.64 um scan (condition 6).** PHerc0343, an unseen scroll whose First Letters prize was awarded on October 8, has two published winding meshes on its 8.64 um scan: w047 and w048 from Erwin Nieuwlaar's prize work (github.com/Nieuwlaar/pherc343-first-letters, `outputs/`, in level-0 voxels of `20250521140437-8.640um-1.2m-116keV-masked.zarr`). They are spiral-fit surfaces, not hand traces, and his fit did not use this model (`dense_spacing_mode: "phase"` in his `mesh/README.md`). Like the scan, the meshes are CC BY-NC, so they are not copied here. villa's sampler skips windings fewer than 4 apart by default; with its `min_winding_gap` key set to 1, the unchanged dataset draws 256 rays that cross both meshes, and every supervised column holds exactly those two crossings. Ray origins lie in z 10048 to 10476 (3.7 mm). Each ray is read natively and at 9.63 um (configs `cond6_*`):
+
+| PHerc0343, real 8.64 um scan | Slabs | Precision | Recall | Count error | Phase MAE |
+|---|---|---|---|---|---|
+| **8.64 um (native, step 1)** | 256 | **0.505, -0.033 (-0.049 to -0.016)** | 0.320, -0.001 (-0.013 to +0.011) | **0.325, +0.025 (+0.015 to +0.035)** | 0.307, +0.017 (-0.002 to +0.033) |
+| 9.63 um (step 1.115, reference) | 256 | 0.537 | 0.320 | 0.300 | 0.290 |
+
+Here the count error is how far the predicted phase change between the two meshes is from one winding, on average. Native reading raises it by 0.025 (8 %), close to the re-sampled PHerc0139 result (+0.036), and the phase MAE rises by the same 0.017, though its interval touches zero. Precision also drops at 8.64 um. That drop is not a tolerance effect: at 9.63 um the tolerance spans fewer samples (1.79 against 2). Absolute values do not compare with the training-scroll tables: the labels are a spiral fit, every column spans a single winding gap, and the rays are steeper (median |dz| 0.50, against 0.18 on PHerc0139 and 0.30 on PHerc1667). Most of the change sits in the 195 steeper slabs (|dz| of 0.30 or more: count error +0.029, +0.018 to +0.041); the 61 others give +0.010 (-0.004 to +0.025). At both steps about 32 % of each mesh's crossings have a passage within 2 voxels (17.3 um), and the passages sit about 16 um inside the pair, toward the other mesh.
+
+**Limits.** Re-sampling a 9.362 um scan reproduces the change of scale, not the finer detail of a real 8.64 um scan, and the replayed beam is 113 keV against 116 keV. Both re-sampled scrolls are training scrolls, and PHerc1667 was read on its training scan. PHerc0343 covers a real 8.64 um scan of an unseen scroll, but only one pair of adjacent windings in one 3.7 mm band, with spiral-fit meshes as labels.
+
+**For users.** Resample 8.64 um volumes to the training voxel (about 9.6 um) before running the model, and read 9.362 um volumes as they are (section 4: 9.36 against 9.63 um changes nothing). villa's `infer_winding_volume.py` takes the slab step from the checkpoint config (`spacing: 1.0`, one voxel of the `--volume-scale` level) and has no option to change it, so as released it reads an 8.64 um volume at 8.64 um. MODEL_CARD.md lists the 22 volumes by voxel size.
+
+## 7. Runtime and memory on the M4 Max
 
 | Setting | Forward, batch of 2 slabs | End to end per slab | 256 slabs | MPS peak | Host RSS |
 |---|---|---|---|---|---|
@@ -128,9 +185,9 @@ Removing the two meshes changes nothing measurable. villa's 3-sample crossing me
 | bf16 autocast, MPS | 1.48 s | 1.48 s | 6.3 min | 10.2 GiB | as above |
 | fp32, CPU (measured while MPS was busy, rough) | 34.6 s | | | | |
 
-Data workers keep the GPU fed once chunks are cached (data wait under 0.3 s per batch). villa's metric code plus the per-winding diagnostic take 1.2 to 1.5 s per batch on the CPU. CT streamed for all runs: 27.9 GB of raw 128^3 chunks (PHerc0139: 4.4 GB of 2.399 um level 2 and 4.4 to 4.5 GB per 9.362 um reconstruction; PHerc0172 7.5 GB; PHerc1667 2.2 GB; PHercMANBp 0.4 GB), plus 3.2 GB of meshes and the 146 MB checkpoint. Nothing is re-hosted.
+Data workers keep the GPU fed once chunks are cached (data wait under 0.3 s per batch). villa's metric code plus the per-winding diagnostic take 1.2 to 1.5 s per batch on the CPU. CT streamed for all runs: 27.9 GB of raw 128^3 chunks (PHerc0139: 4.4 GB of 2.399 um level 2 and 4.4 to 4.5 GB per 9.362 um reconstruction; PHerc0172 7.5 GB; PHerc1667 2.2 GB; PHercMANBp 0.4 GB), plus 3.2 GB of meshes and the 146 MB checkpoint. Nothing is re-hosted. Condition 5's ten runs took 11.6 to 12.7 minutes each in fp32 on MPS (forward 3.45 to 3.65 s per batch) and streamed another 0.78 GB for the longer rays at 10.2 and 10.8 um. Condition 6 took 13.1 and 12.3 minutes and streamed 2.46 GB of PHerc0343 level-0 chunks.
 
-## 7. What it took to run on macOS
+## 8. What it took to run on macOS
 
 | Problem | Fix | Patch for villa |
 |---|---|---|
@@ -140,14 +197,15 @@ Data workers keep the GPU fed once chunks are cached (data wait under 0.3 s per 
 
 A patched villa checkout, using only these three patches and the standalone `vc.grid_raycast`, reproduces the harness exactly on 8 slabs: labels identical, all 50.3 M image voxels identical (`scripts/check_villa_patches.py`, `patches/README.md`). No other change was needed for MPS: the model runs in fp32 with `PYTORCH_ENABLE_MPS_FALLBACK=0`.
 
-## 8. Limitations
+## 9. Limitations
 
 - One z band per scroll and 256 slabs per condition. Angular-block intervals (in `windeval.report`) are close to the slab intervals for PHerc0139 but wider for count error on the Paganin variants (1.2 to 3.5).
 - The training rows pool three scrolls; PHercParis4's training segments (`spiral_fit`) are not public, so its share of the logged numbers cannot be reproduced.
 - The NumPy sampler matches villa's C++ sampler semantics as read from the source, and scipy numerically, but was never run side by side with the C++ code.
 - The labels are the published meshes. The training meshes (`winding_train_data/*/segments`) are not public; the published ones, divided by 4, reproduce the training numbers outside the w040 to w049 band.
+- Section 6's 8.64 um result comes mainly from re-sampled scans of two training scrolls; the real 8.64 um check (PHerc0343) has one pair of adjacent, spiral-fit windings as labels.
 
-## 9. Rerun
+## 10. Rerun
 
 Setup is in [README.md](README.md). With `WINDEVAL_DATA` pointing at the data root and `PY=.venv/bin/python`:
 
@@ -170,7 +228,18 @@ Setup is in [README.md](README.md). With `WINDEVAL_DATA` pointing at the data ro
     $PY -m windeval.compare --ref $R/gate_pherc0139_2399_l2_z3904 $R/cond2fair_pherc0139_9362_default \
         $R/cond4_pherc0139_9362_default_native $R/cond4_pherc0139_9362_default_zblur1 $R/cond4_pherc0139_9362_default_blur1 \
         $R/cond2fair_pherc0139_9362_pag50 $R/cond2fair_pherc0139_9362_pag0 --band 40 49 --json results/compare_pherc0139_scans.json
-    $PY scripts/collect_results.py <run names> && $PY scripts/make_figures.py
+    for c in cond5_pherc0139_9362_eq790 cond5_pherc0139_9362_eq830 cond5_pherc0139_9362_eq864 cond5_pherc0139_9362_eq900 \
+             cond5_pherc0139_9362_eq1020 cond5_pherc0139_9362_eq1080 cond5_pherc1667_2399_l2_eq830 \
+             cond5_pherc1667_2399_l2_eq864 cond5_pherc1667_2399_l2_eq936 cond5_pherc1667_2399_l2_eq1020; do
+      $PY -m windeval.evaluate configs/$c.json; done                                                       # section 6
+    # condition 6: w047 and w048 from github.com/Nieuwlaar/pherc343-first-letters (outputs/) copied to
+    # $WINDEVAL_DATA/eval/PHerc0343/segments_w047_w048_nieuwlaar/w047_R5B2 and .../w048_R5B2 (not the concat mesh)
+    $PY scripts/make_mirror.py https://vesuvius-challenge-open-data.s3.us-east-1.amazonaws.com/PHerc0343/volumes/20250521140437-8.640um-1.2m-116keV-masked.zarr \
+        "$WINDEVAL_DATA/zarr/PHerc0343/volumes/20250521140437-8.640um-1.2m-116keV-masked.zarr" 0
+    for c in cond6_pherc0343_864_native cond6_pherc0343_864_to963; do $PY -m windeval.evaluate configs/$c.json; done
+    $PY scripts/collect_results.py <run names>
+    $PY scripts/voxel_sweep.py > results/compare_voxel_sweep.md                                              # section 6 tables
+    $PY scripts/make_figures.py
 
 Configs that start the same way (same seed, worker count and region) draw identical slabs, so every paired comparison above can be regenerated exactly. Per-run results (`result.json` with metrics, timings, memory and data volumes; `slabs.jsonl` with per-slab metric sums and ray geometry) are in `results/runs/`.
 
